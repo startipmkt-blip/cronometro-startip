@@ -56,7 +56,7 @@ export default function WeeklyReport({ user }: { user: Usuario }) {
       .gte("inicio", startDate.toISOString())
       .order("inicio", { ascending: true });
 
-    const allRegistros = data || [];
+    const allRegistros = (data || []) as unknown as RegistroTempo[];
     const result: WeekData[] = [];
 
     for (let i = 0; i < weeksBack; i++) {

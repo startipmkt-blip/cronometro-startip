@@ -29,7 +29,7 @@ export default function DailyReport({ user }: { user: Usuario }) {
       .lte("inicio", endOfDay)
       .order("inicio", { ascending: true });
 
-    if (data) setRegistros(data);
+    if (data) setRegistros(data as unknown as RegistroTempo[]);
   }
 
   const totalSeconds = registros.reduce(

@@ -26,7 +26,7 @@ export default function History() {
       supabase.from("usuarios").select("id, nome").order("nome"),
       supabase.from("tipos_tarefa").select("id, nome").order("nome"),
     ]);
-    if (regRes.data) setRegistros(regRes.data);
+    if (regRes.data) setRegistros(regRes.data as unknown as RegistroTempo[]);
     if (usrRes.data) setUsuarios(usrRes.data);
     if (tipRes.data) setTipos(tipRes.data);
   }
