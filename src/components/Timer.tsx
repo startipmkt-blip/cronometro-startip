@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Usuario, TipoTarefa } from "@/lib/types";
+import type { Usuario, TipoTarefa, RegistroTempo } from "@/lib/types";
 import { formatDuration } from "@/lib/format";
 
 export default function Timer({
@@ -30,10 +30,48 @@ export default function Timer({
 
   useEffect(() => {
     loadTipos();
+    recoverActiveTask();
     return () => {
       document.title = "Cronômetro Startip";
     };
-  }, []);
+  }, [user.id]);
+
+  async function recoverActiveTask() {
+    const { data } = await supabase
+      .from("registros_tempo")
+      .select("*, tipos_tarefa(nome)")
+      .eq("usuario_id", user.id)
+      .is("fim", null)
+      .order("inicio", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!data) return;
+
+    const record = data as unknown as RegistroTempo;
+    const start = new Date(record.inicio);
+    const savedPausedTotal = record.tempo_pausado_total || 0;
+
+    setRegistroId(record.id);
+    setTipoId(record.tipo_tarefa_id);
+    setDescricao(record.descricao);
+    setStartTime(start);
+    setRunning(true);
+
+    if (record.pausado) {
+      setPaused(true);
+      setPausedTotal(savedPausedTotal);
+      const pStart = record.inicio_pausa ? new Date(record.inicio_pausa) : new Date();
+      setPauseStart(pStart);
+      const totalRaw = Math.floor((Date.now() - start.getTime()) / 1000);
+      const currentPauseDuration = Math.floor((Date.now() - pStart.getTime()) / 1000);
+      setElapsed(Math.max(totalRaw - savedPausedTotal - currentPauseDuration, 0));
+    } else {
+      setPaused(false);
+      setPausedTotal(savedPausedTotal);
+      startTicking(start, savedPausedTotal);
+    }
+  }
 
   useEffect(() => {
     if (!paused || !pauseStart) {
