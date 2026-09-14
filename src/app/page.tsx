@@ -75,14 +75,13 @@ export default function Home() {
 
       {/* Content */}
       <main className="flex-1 py-4">
-        {tab === "timer" ? (
+        <div hidden={tab !== "timer"}>
           <Timer
             user={user}
             onFinish={() => setHistoryKey((k) => k + 1)}
           />
-        ) : (
-          <History key={historyKey} />
-        )}
+        </div>
+        {tab === "history" && <History key={historyKey} />}
       </main>
     </div>
   );
