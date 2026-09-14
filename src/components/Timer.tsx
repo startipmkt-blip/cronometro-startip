@@ -17,8 +17,11 @@ export default function Timer({
   const [novoTipo, setNovoTipo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [running, setRunning] = useState(false);
+  const [paused, setPaused] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [startTime, setStartTime] = useState<Date | null>(null);
+  const [pausedTotal, setPausedTotal] = useState(0);
+  const [pauseStart, setPauseStart] = useState<Date | null>(null);
   const [registroId, setRegistroId] = useState<string | null>(null);
   const [showNewType, setShowNewType] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -26,6 +29,14 @@ export default function Timer({
   useEffect(() => {
     loadTipos();
   }, []);
+
+  function startTicking(start: Date, alreadyPaused: number) {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      const total = Math.floor((Date.now() - start.getTime()) / 1000);
+      setElapsed(total - alreadyPaused);
+    }, 1000);
+  }
 
   async function loadTipos() {
     const { data } = await supabase
@@ -58,11 +69,12 @@ export default function Timer({
     const now = new Date();
     setStartTime(now);
     setRunning(true);
+    setPaused(false);
     setElapsed(0);
+    setPausedTotal(0);
+    setPauseStart(null);
 
-    intervalRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - now.getTime()) / 1000));
-    }, 1000);
+    startTicking(now, 0);
 
     const { data } = await supabase
       .from("registros_tempo")
@@ -78,21 +90,78 @@ export default function Timer({
     if (data) setRegistroId(data.id);
   }
 
+  async function handlePause() {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    setPaused(true);
+    const now = new Date();
+    setPauseStart(now);
+
+    if (registroId) {
+      await supabase
+        .from("registros_tempo")
+        .update({
+          pausado: true,
+          inicio_pausa: now.toISOString(),
+          tempo_pausado_total: pausedTotal,
+        })
+        .eq("id", registroId);
+    }
+  }
+
+  async function handleResume() {
+    const now = new Date();
+    const pauseDuration = pauseStart
+      ? Math.floor((now.getTime() - pauseStart.getTime()) / 1000)
+      : 0;
+    const newPausedTotal = pausedTotal + pauseDuration;
+
+    setPaused(false);
+    setPausedTotal(newPausedTotal);
+    setPauseStart(null);
+
+    if (startTime) {
+      startTicking(startTime, newPausedTotal);
+    }
+
+    if (registroId) {
+      await supabase
+        .from("registros_tempo")
+        .update({
+          pausado: false,
+          inicio_pausa: null,
+          tempo_pausado_total: newPausedTotal,
+        })
+        .eq("id", registroId);
+    }
+  }
+
   async function handleStop() {
     if (intervalRef.current) clearInterval(intervalRef.current);
     setRunning(false);
+    setPaused(false);
 
     const fim = new Date();
-    const duracao = startTime
+    let finalPausedTotal = pausedTotal;
+    if (pauseStart) {
+      finalPausedTotal += Math.floor(
+        (fim.getTime() - pauseStart.getTime()) / 1000
+      );
+    }
+
+    const totalRaw = startTime
       ? Math.floor((fim.getTime() - startTime.getTime()) / 1000)
       : elapsed;
+    const duracao = totalRaw - finalPausedTotal;
 
     if (registroId) {
       await supabase
         .from("registros_tempo")
         .update({
           fim: fim.toISOString(),
-          duracao_segundos: duracao,
+          duracao_segundos: Math.max(duracao, 0),
+          pausado: false,
+          inicio_pausa: null,
+          tempo_pausado_total: finalPausedTotal,
         })
         .eq("id", registroId);
     }
@@ -101,12 +170,16 @@ export default function Timer({
     setDescricao("");
     setElapsed(0);
     setStartTime(null);
+    setPausedTotal(0);
+    setPauseStart(null);
     setRegistroId(null);
     onFinish();
   }
 
   const canStart =
     !running && (tipoId || (showNewType && novoTipo.trim()));
+
+  const isActive = running && !paused;
 
   return (
     <div className="flex flex-col gap-5 w-full max-w-md mx-auto p-4">
@@ -208,10 +281,24 @@ export default function Timer({
       >
         <div
           className="text-5xl font-mono font-bold tabular-nums"
-          style={{ color: running ? "var(--success)" : "var(--text)" }}
+          style={{
+            color: paused
+              ? "var(--warning, #f59e0b)"
+              : isActive
+                ? "var(--success)"
+                : "var(--text)",
+          }}
         >
           {formatDuration(elapsed)}
         </div>
+        {paused && (
+          <div
+            className="text-sm font-semibold mt-2 animate-pulse"
+            style={{ color: "var(--warning, #f59e0b)" }}
+          >
+            PAUSADO
+          </div>
+        )}
       </div>
 
       {/* Botões */}
@@ -225,19 +312,32 @@ export default function Timer({
           Iniciar tarefa
         </button>
       ) : (
-        <button
-          onClick={handleStop}
-          className="px-6 py-4 rounded-xl text-lg font-semibold text-white transition-colors cursor-pointer"
-          style={{ background: "var(--danger)" }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.background = "var(--danger-hover)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.background = "var(--danger)")
-          }
-        >
-          Finalizar tarefa
-        </button>
+        <div className="flex flex-col gap-3">
+          {!paused ? (
+            <button
+              onClick={handlePause}
+              className="px-6 py-4 rounded-xl text-lg font-semibold text-white transition-colors cursor-pointer"
+              style={{ background: "var(--warning, #f59e0b)" }}
+            >
+              Pausar
+            </button>
+          ) : (
+            <button
+              onClick={handleResume}
+              className="px-6 py-4 rounded-xl text-lg font-semibold text-white transition-colors cursor-pointer"
+              style={{ background: "var(--success)" }}
+            >
+              Retomar tarefa
+            </button>
+          )}
+          <button
+            onClick={handleStop}
+            className="px-6 py-4 rounded-xl text-lg font-semibold text-white transition-colors cursor-pointer"
+            style={{ background: "var(--danger)" }}
+          >
+            Finalizar tarefa
+          </button>
+        </div>
       )}
     </div>
   );

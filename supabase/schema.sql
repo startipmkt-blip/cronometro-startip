@@ -24,6 +24,9 @@ create table if not exists registros_tempo (
   inicio timestamptz not null,
   fim timestamptz,
   duracao_segundos integer,
+  pausado boolean not null default false,
+  inicio_pausa timestamptz,
+  tempo_pausado_total integer not null default 0,
   created_at timestamptz default now()
 );
 

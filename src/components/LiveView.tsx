@@ -9,6 +9,18 @@ interface ActiveTask extends RegistroTempo {
   elapsedSeconds: number;
 }
 
+function calcElapsed(r: RegistroTempo): number {
+  const now = Date.now();
+  const totalRaw = Math.floor((now - new Date(r.inicio).getTime()) / 1000);
+  let pauseSeconds = r.tempo_pausado_total || 0;
+  if (r.pausado && r.inicio_pausa) {
+    pauseSeconds += Math.floor(
+      (now - new Date(r.inicio_pausa).getTime()) / 1000
+    );
+  }
+  return Math.max(totalRaw - pauseSeconds, 0);
+}
+
 export default function LiveView({ user }: { user: Usuario }) {
   const [myTask, setMyTask] = useState<ActiveTask | null>(null);
   const [teamTasks, setTeamTasks] = useState<ActiveTask[]>([]);
@@ -34,12 +46,9 @@ export default function LiveView({ user }: { user: Usuario }) {
       .order("inicio", { ascending: false });
 
     if (data) {
-      const now = Date.now();
       const tasks = (data as unknown as RegistroTempo[]).map((r) => ({
         ...r,
-        elapsedSeconds: Math.floor(
-          (now - new Date(r.inicio).getTime()) / 1000
-        ),
+        elapsedSeconds: calcElapsed(r),
       }));
 
       setMyTask(tasks.find((t) => t.usuario_id === user.id) || null);
@@ -49,10 +58,15 @@ export default function LiveView({ user }: { user: Usuario }) {
 
   function tickElapsed() {
     setMyTask((prev) =>
-      prev ? { ...prev, elapsedSeconds: prev.elapsedSeconds + 1 } : null
+      prev
+        ? { ...prev, elapsedSeconds: prev.pausado ? prev.elapsedSeconds : prev.elapsedSeconds + 1 }
+        : null
     );
     setTeamTasks((prev) =>
-      prev.map((t) => ({ ...t, elapsedSeconds: t.elapsedSeconds + 1 }))
+      prev.map((t) => ({
+        ...t,
+        elapsedSeconds: t.pausado ? t.elapsedSeconds : t.elapsedSeconds + 1,
+      }))
     );
   }
 
@@ -65,6 +79,20 @@ export default function LiveView({ user }: { user: Usuario }) {
     background: "var(--surface)",
     border: "1px solid var(--border)",
   };
+
+  function renderStatus(task: ActiveTask) {
+    if (task.pausado) {
+      return (
+        <span
+          className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+          style={{ background: "var(--warning, #f59e0b)", color: "#fff" }}
+        >
+          PAUSADO
+        </span>
+      );
+    }
+    return null;
+  }
 
   return (
     <div className="flex flex-col gap-5 w-full max-w-2xl mx-auto p-4">
@@ -86,7 +114,10 @@ export default function LiveView({ user }: { user: Usuario }) {
         {myTask ? (
           <div
             className="p-4 rounded-xl flex flex-col gap-3"
-            style={{ ...cardStyle, borderLeft: "4px solid var(--success)" }}
+            style={{
+              ...cardStyle,
+              borderLeft: `4px solid ${myTask.pausado ? "var(--warning, #f59e0b)" : "var(--success)"}`,
+            }}
           >
             <div className="flex justify-between items-start">
               <div className="flex flex-col gap-1">
@@ -97,6 +128,7 @@ export default function LiveView({ user }: { user: Usuario }) {
                   >
                     {(myTask.tipos_tarefa as unknown as TipoTarefa)?.nome}
                   </span>
+                  {renderStatus(myTask)}
                   {myTask.descricao && (
                     <span className="text-sm" style={{ color: "var(--text-muted)" }}>
                       {myTask.descricao}
@@ -107,7 +139,9 @@ export default function LiveView({ user }: { user: Usuario }) {
               <div className="text-right">
                 <div
                   className="text-3xl font-mono font-bold tabular-nums"
-                  style={{ color: "var(--success)" }}
+                  style={{
+                    color: myTask.pausado ? "var(--warning, #f59e0b)" : "var(--success)",
+                  }}
                 >
                   {formatDuration(myTask.elapsedSeconds)}
                 </div>
@@ -158,9 +192,12 @@ export default function LiveView({ user }: { user: Usuario }) {
               style={cardStyle}
             >
               <div className="flex flex-col gap-1">
-                <span className="font-semibold text-sm">
-                  {(t.usuarios as unknown as Usuario)?.nome}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm">
+                    {(t.usuarios as unknown as Usuario)?.nome}
+                  </span>
+                  {renderStatus(t)}
+                </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span
                     className="text-xs px-2 py-0.5 rounded-full"
@@ -178,7 +215,9 @@ export default function LiveView({ user }: { user: Usuario }) {
               <div className="text-right">
                 <div
                   className="text-lg font-mono font-bold tabular-nums"
-                  style={{ color: "var(--success)" }}
+                  style={{
+                    color: t.pausado ? "var(--warning, #f59e0b)" : "var(--success)",
+                  }}
                 >
                   {formatDuration(t.elapsedSeconds)}
                 </div>
