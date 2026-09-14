@@ -6,12 +6,14 @@ import Timer from "@/components/Timer";
 import History from "@/components/History";
 import DailyReport from "@/components/DailyReport";
 import WeeklyReport from "@/components/WeeklyReport";
+import LiveView from "@/components/LiveView";
 import type { Usuario } from "@/lib/types";
 
-type Tab = "timer" | "daily" | "weekly" | "history";
+type Tab = "timer" | "live" | "daily" | "weekly" | "history";
 
 const TAB_LABELS: Record<Tab, string> = {
   timer: "Cronômetro",
+  live: "Ao Vivo",
   daily: "Dia",
   weekly: "Semana",
   history: "Histórico",
@@ -90,6 +92,7 @@ export default function Home() {
             onFinish={() => setRefreshKey((k) => k + 1)}
           />
         </div>
+        {tab === "live" && <LiveView key={refreshKey} />}
         {tab === "daily" && <DailyReport key={refreshKey} user={user} />}
         {tab === "weekly" && <WeeklyReport key={refreshKey} user={user} />}
         {tab === "history" && <History key={refreshKey} />}
