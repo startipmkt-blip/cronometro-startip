@@ -24,11 +24,42 @@ export default function Timer({
   const [pauseStart, setPauseStart] = useState<Date | null>(null);
   const [registroId, setRegistroId] = useState<string | null>(null);
   const [showNewType, setShowNewType] = useState(false);
+  const [longPauseAlert, setLongPauseAlert] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const longPauseNotified = useRef(false);
 
   useEffect(() => {
     loadTipos();
+    return () => {
+      document.title = "Cronômetro Startip";
+    };
   }, []);
+
+  useEffect(() => {
+    if (!paused || !pauseStart) {
+      setLongPauseAlert(false);
+      longPauseNotified.current = false;
+      return;
+    }
+    const checkPause = setInterval(() => {
+      const pausedSecs = Math.floor((Date.now() - pauseStart.getTime()) / 1000);
+      if (pausedSecs >= 1800 && !longPauseNotified.current) {
+        setLongPauseAlert(true);
+        longPauseNotified.current = true;
+      }
+    }, 10000);
+    return () => clearInterval(checkPause);
+  }, [paused, pauseStart]);
+
+  useEffect(() => {
+    if (running && !paused) {
+      document.title = `${formatDuration(elapsed)} — Cronômetro Startip`;
+    } else if (paused) {
+      document.title = `⏸ PAUSADO — Cronômetro Startip`;
+    } else {
+      document.title = "Cronômetro Startip";
+    }
+  }, [elapsed, running, paused]);
 
   function startTicking(start: Date, alreadyPaused: number) {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -300,6 +331,19 @@ export default function Timer({
           </div>
         )}
       </div>
+
+      {/* Alerta pausa longa */}
+      {longPauseAlert && paused && (
+        <div
+          className="p-3 rounded-xl text-center text-sm font-semibold animate-pulse"
+          style={{
+            background: "var(--danger)",
+            color: "#fff",
+          }}
+        >
+          Pausa de mais de 30 minutos! Esqueceu de retomar?
+        </div>
+      )}
 
       {/* Botões */}
       {!running ? (
