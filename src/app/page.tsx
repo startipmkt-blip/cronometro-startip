@@ -92,7 +92,7 @@ export default function Home() {
             onFinish={() => setRefreshKey((k) => k + 1)}
           />
         </div>
-        {tab === "live" && <LiveView key={refreshKey} />}
+        {tab === "live" && <LiveView key={refreshKey} user={user} />}
         {tab === "daily" && <DailyReport key={refreshKey} user={user} />}
         {tab === "weekly" && <WeeklyReport key={refreshKey} user={user} />}
         {tab === "history" && <History key={refreshKey} />}
