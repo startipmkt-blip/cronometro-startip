@@ -4,14 +4,23 @@ import { useState } from "react";
 import UserSelect from "@/components/UserSelect";
 import Timer from "@/components/Timer";
 import History from "@/components/History";
+import DailyReport from "@/components/DailyReport";
+import WeeklyReport from "@/components/WeeklyReport";
 import type { Usuario } from "@/lib/types";
 
-type Tab = "timer" | "history";
+type Tab = "timer" | "daily" | "weekly" | "history";
+
+const TAB_LABELS: Record<Tab, string> = {
+  timer: "Cronômetro",
+  daily: "Dia",
+  weekly: "Semana",
+  history: "Histórico",
+};
 
 export default function Home() {
   const [user, setUser] = useState<Usuario | null>(null);
   const [tab, setTab] = useState<Tab>("timer");
-  const [historyKey, setHistoryKey] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   if (!user) {
     return <UserSelect onSelect={setUser} />;
@@ -51,24 +60,24 @@ export default function Home() {
 
       {/* Tabs */}
       <nav
-        className="flex border-b sticky top-[49px] z-10"
+        className="flex border-b sticky top-[49px] z-10 overflow-x-auto"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
-        {(["timer", "history"] as Tab[]).map((t) => (
+        {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => {
               setTab(t);
-              if (t === "history") setHistoryKey((k) => k + 1);
+              if (t !== "timer") setRefreshKey((k) => k + 1);
             }}
-            className="flex-1 py-3 text-sm font-medium transition-colors cursor-pointer"
+            className="flex-1 py-3 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap px-2"
             style={{
               color: tab === t ? "var(--primary)" : "var(--text-muted)",
               borderBottom:
                 tab === t ? "2px solid var(--primary)" : "2px solid transparent",
             }}
           >
-            {t === "timer" ? "Cronômetro" : "Histórico"}
+            {TAB_LABELS[t]}
           </button>
         ))}
       </nav>
@@ -78,10 +87,12 @@ export default function Home() {
         <div hidden={tab !== "timer"}>
           <Timer
             user={user}
-            onFinish={() => setHistoryKey((k) => k + 1)}
+            onFinish={() => setRefreshKey((k) => k + 1)}
           />
         </div>
-        {tab === "history" && <History key={historyKey} />}
+        {tab === "daily" && <DailyReport key={refreshKey} user={user} />}
+        {tab === "weekly" && <WeeklyReport key={refreshKey} user={user} />}
+        {tab === "history" && <History key={refreshKey} />}
       </main>
     </div>
   );
